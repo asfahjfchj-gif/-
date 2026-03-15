@@ -1,11 +1,5 @@
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
-
-local Window = Rayfield:CreateWindow({
-    Name = "Military Tycoon | XENO",
-    LoadingTitle = "Military Tycoon Cheat",
-    LoadingSubtitle = "by Senior Scripter",
-    ConfigurationSaving = {Enabled = false}
-})
+-- Military Tycoon Script - Fast Load Version (No GUI)
+-- Hotkeys: INS=ESP, DEL=Chams, HOME=Aimbot, END=Target, PGUP=TP, PGDN=AutoTP, F=Fly, R=Reload Target List
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -26,7 +20,7 @@ local holdingRMB = false
 local espEnabled = true
 local chamsEnabled = true
 local boxEnabled = true
-local nameEnabled = true
+local showNames = true
 local showDistance = true
 local showHealth = true
 local boxColor = Color3.fromRGB(255, 50, 50)
@@ -36,6 +30,11 @@ local maxESPDistance = 500
 local visibleColor = Color3.fromRGB(0, 255, 100)
 local occludedColor = Color3.fromRGB(100, 100, 100)
 local outlineColor = Color3.fromRGB(255, 255, 255)
+
+-- Fly
+local flyEnabled = false
+local flySpeed = 2
+local flyKeys = {}
 
 -- ================== ESP + CHAMS ==================
 local ESPObjects = {}
@@ -114,11 +113,11 @@ local function UpdateESP()
                 objects.Box.Visible = boxEnabled
                 objects.Box.Color = boxColor
 
-                if nameEnabled then
+                if showNames then
                     local text = player.DisplayName
                     if showDistance then text = text .. " [" .. math.floor(dist) .. "m]" end
                     if showHealth and humanoid then text = text .. " " .. math.floor(humanoid.Health) .. "hp" end
-                    
+
                     objects.Name.Text = text
                     objects.Name.Position = Vector2.new(pos.X, pos.Y - height/2 - 18)
                     objects.Name.Visible = true
@@ -188,7 +187,7 @@ RunService.RenderStepped:Connect(function()
     if not aimbotEnabled or not holdingRMB then return end
 
     local target = selectedTarget
-    
+
     -- Проверка текущей цели
     if target and target.Character and target.Character:FindFirstChild(aimPart) then
         local pos = Camera:WorldToScreenPoint(target.Character[aimPart].Position)
@@ -203,10 +202,10 @@ RunService.RenderStepped:Connect(function()
             if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild(aimPart) then
                 local humanoid = plr.Character:FindFirstChildOfClass("Humanoid")
                 if humanoid and humanoid.Health <= 0 then continue end
-                
+
                 local pos = Camera:WorldToScreenPoint(plr.Character[aimPart].Position)
                 local distFromCenter = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
-                
+
                 if distFromCenter < fov and distFromCenter < closestDist then
                     local localChar = LocalPlayer.Character
                     local myHead = localChar and localChar:FindFirstChild("Head")
@@ -228,165 +227,109 @@ RunService.RenderStepped:Connect(function()
     -- Поворот камеры
     if target and target.Character and target.Character:FindFirstChild(aimPart) then
         local targetPos = target.Character[aimPart].Position
-        local currentLookVector = Camera.CFrame.LookVector
-        local direction = (targetPos - Camera.CFrame.Position).Unit
-        local dot = currentLookVector:Dot(direction)
-        local angle = math.deg(math.acos(math.clamp(dot, -1, 1)))
-        
-        if angle <= 180 then
-            Camera.CFrame = Camera.CFrame:Lerp(CFrame.lookAt(Camera.CFrame.Position, targetPos), smoothness)
-        end
+        Camera.CFrame = Camera.CFrame:Lerp(CFrame.lookAt(Camera.CFrame.Position, targetPos), smoothness)
     end
 end)
 
--- ================== GUI ==================
-local Visuals = Window:CreateTab("Visuals", "eye")
-local Combat = Window:CreateTab("Combat", "sword")
-local TargetsTab = Window:CreateTab("Targets", "target")
-local Movement = Window:CreateTab("Movement", "run")
-
--- Visuals
-Visuals:CreateSection("ESP Settings")
-
-Visuals:CreateToggle({Name = "Box ESP", CurrentValue = boxEnabled, Callback = function(v) boxEnabled = v end})
-
-Visuals:CreateToggle({Name = "ESP Enabled", CurrentValue = espEnabled, Callback = function(v) espEnabled = v end})
-
-Visuals:CreateColorPicker({Name = "Box Color", CurrentColor = boxColor, Callback = function(color) boxColor = color end})
-
-Visuals:CreateToggle({Name = "Show Names", CurrentValue = nameEnabled, Callback = function(v) nameEnabled = v end})
-
-Visuals:CreateToggle({Name = "Show Distance", CurrentValue = showDistance, Callback = function(v) showDistance = v end})
-
-Visuals:CreateToggle({Name = "Show Health", CurrentValue = showHealth, Callback = function(v) showHealth = v end})
-
-Visuals:CreateSlider({Name = "Max ESP Distance", Range = {100, 1000}, Increment = 50, CurrentValue = maxESPDistance, Callback = function(v) maxESPDistance = v end})
-
-Visuals:CreateDivider()
-
-Visuals:CreateSection("Chams Settings")
-
-Visuals:CreateToggle({Name = "Chams Enabled", CurrentValue = chamsEnabled, Callback = function(v) chamsEnabled = v end})
-
-Visuals:CreateColorPicker({Name = "Visible Color", CurrentColor = visibleColor, Callback = function(color) visibleColor = color end})
-
-Visuals:CreateColorPicker({Name = "Occluded Color", CurrentColor = occludedColor, Callback = function(color) occludedColor = color end})
-
-Visuals:CreateColorPicker({Name = "Outline Color", CurrentColor = outlineColor, Callback = function(color) outlineColor = color end})
-
--- Combat
-Combat:CreateSection("Aimbot Settings")
-
-Combat:CreateToggle({Name = "Aimbot (зажми ПКМ)", CurrentValue = aimbotEnabled, Callback = function(v) aimbotEnabled = v end})
-
-Combat:CreateSlider({Name = "Smoothness", Range = {0.05, 1}, Increment = 0.05, CurrentValue = smoothness, Callback = function(v) smoothness = v end})
-
-Combat:CreateSlider({Name = "FOV", Range = {50, 400}, Increment = 10, CurrentValue = fov, Callback = function(v) fov = v end})
-
-Combat:CreateDropdown({
-    Name = "Aim Part",
-    Options = {"Head", "Torso", "HumanoidRootPart"},
-    CurrentOption = "Head",
-    Callback = function(opt) aimPart = opt end
-})
-
-Combat:CreateLabel("Hold RIGHT MOUSE BUTTON to aim at target")
-
--- Targets
-TargetsTab:CreateSection("Player List")
-
-local targetDropdownOptions = {}
-
-local function RefreshTargets()
-    targetDropdownOptions = {}
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer then 
-            local dist = plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and 
-                         math.floor((LocalPlayer.Character.HumanoidRootPart.Position - plr.Character.HumanoidRootPart.Position).Magnitude) or 0
-            table.insert(targetDropdownOptions, plr.Name .. " [" .. dist .. "m]")
-        end
-    end
-    
-    if #targetDropdownOptions == 0 then
-        targetDropdownOptions = {"No players"}
-    end
-    
-    if targetDropdown then
-        targetDropdown:SetOptions(targetDropdownOptions)
-    end
-    
-    Rayfield:Notify({Title = "Список обновлён", Content = "Игроков: " .. #targetDropdownOptions, Duration = 2})
+-- ================== HOTKEYS ==================
+local function PrintStatus(func, status)
+    print(func .. ": " .. tostring(status))
 end
 
-TargetsTab:CreateButton({Name = "🔄 Обновить список игроков", Callback = RefreshTargets})
-
-local targetDropdown
-targetDropdown = TargetsTab:CreateDropdown({
-    Name = "Выбрать цель",
-    Options = targetDropdownOptions,
-    CurrentOption = {},
-    MultipleOptions = false,
-    Flag = "targetSelect",
-    Callback = function(opt)
-        local playerName = opt[1] or opt
-        if playerName and playerName ~= "No players" then
-            playerName = playerName:match("^(%S+)")
-            selectedTarget = Players:FindFirstChild(playerName)
-            if selectedTarget then
-                Rayfield:Notify({Title = "Цель выбрана", Content = selectedTarget.Name, Duration = 2})
-            end
+local function GetPlayerList()
+    local list = {}
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer then
+            local dist = plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and
+                         math.floor((LocalPlayer.Character.HumanoidRootPart.Position - plr.Character.HumanoidRootPart.Position).Magnitude) or 0
+            table.insert(list, plr.Name .. " [" .. dist .. "m]")
         end
     end
-})
+    return list
+end
 
-TargetsTab:CreateDivider()
-
-TargetsTab:CreateSection("Teleport Actions")
-
-TargetsTab:CreateButton({Name = "TP к цели (разово)", Callback = function()
-    if selectedTarget and selectedTarget.Character and selectedTarget.Character:FindFirstChild("HumanoidRootPart") then
-        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            LocalPlayer.Character.HumanoidRootPart.CFrame = selectedTarget.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 5)
-            Rayfield:Notify({Title = "Teleport", Content = "Teleported to " .. selectedTarget.Name, Duration = 2})
+local function SelectRandomTarget()
+    local players = Players:GetPlayers()
+    local available = {}
+    for _, plr in pairs(players) do
+        if plr ~= LocalPlayer and plr.Character then
+            table.insert(available, plr)
         end
+    end
+    if #available > 0 then
+        selectedTarget = available[math.random(1, #available)]
+        print("Target selected: " .. selectedTarget.Name)
     else
-        Rayfield:Notify({Title = "Teleport", Content = "No target selected!", Duration = 3})
+        print("No available targets!")
     end
-end})
+end
 
-TargetsTab:CreateToggle({Name = "Постоянный TP на цель", CurrentValue = false, Callback = function(v)
-    constantTP = v
-    if v and selectedTarget then
-        task.spawn(function()
-            while constantTP and selectedTarget and selectedTarget.Character do
-                if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                    LocalPlayer.Character.HumanoidRootPart.CFrame = selectedTarget.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 4)
-                end
-                task.wait(0.03)
+UserInputService.InputBegan:Connect(function(input, processed)
+    if processed then return end
+
+    if input.KeyCode == Enum.KeyCode.Insert then
+        espEnabled = not espEnabled
+        PrintStatus("ESP", espEnabled)
+    elseif input.KeyCode == Enum.KeyCode.Delete then
+        chamsEnabled = not chamsEnabled
+        PrintStatus("Chams", chamsEnabled)
+    elseif input.KeyCode == Enum.KeyCode.Home then
+        aimbotEnabled = not aimbotEnabled
+        PrintStatus("Aimbot", aimbotEnabled)
+    elseif input.KeyCode == Enum.KeyCode.End then
+        SelectRandomTarget()
+    elseif input.KeyCode == Enum.KeyCode.PageUp then
+        if selectedTarget and selectedTarget.Character and selectedTarget.Character:FindFirstChild("HumanoidRootPart") then
+            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                LocalPlayer.Character.HumanoidRootPart.CFrame = selectedTarget.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 5)
+                print("Teleported to " .. selectedTarget.Name)
             end
-        end)
+        else
+            print("No target selected!")
+        end
+    elseif input.KeyCode == Enum.KeyCode.PageDown then
+        constantTP = not constantTP
+        PrintStatus("Auto TP", constantTP)
+        if constantTP and selectedTarget then
+            task.spawn(function()
+                while constantTP and selectedTarget and selectedTarget.Character do
+                    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                        LocalPlayer.Character.HumanoidRootPart.CFrame = selectedTarget.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 4)
+                    end
+                    task.wait(0.03)
+                end
+            end)
+        end
+    elseif input.KeyCode == Enum.KeyCode.F then
+        flyEnabled = not flyEnabled
+        PrintStatus("Fly", flyEnabled)
+        if flyEnabled then
+            local character = LocalPlayer.Character
+            if character then
+                local flyPart = character:FindFirstChild("HumanoidRootPart") or character:WaitForChild("HumanoidRootPart")
+                flyPart.Anchored = true
+            end
+        end
+    elseif input.KeyCode == Enum.KeyCode.R then
+        local players = GetPlayerList()
+        print("Players: " .. #players)
+        for _, p in pairs(players) do print("  - " .. p) end
+    elseif input.KeyCode == Enum.KeyCode.KeypadPlus then
+        flySpeed = math.min(flySpeed + 1, 10)
+        print("Fly Speed: " .. flySpeed)
+    elseif input.KeyCode == Enum.KeyCode.KeypadMinus then
+        flySpeed = math.max(flySpeed - 1, 1)
+        print("Fly Speed: " .. flySpeed)
+    elseif input.KeyCode == Enum.KeyCode.LeftBracket then
+        fov = math.max(fov - 10, 50)
+        print("FOV: " .. fov)
+    elseif input.KeyCode == Enum.KeyCode.RightBracket then
+        fov = math.min(fov + 10, 400)
+        print("FOV: " .. fov)
     end
-end})
+end)
 
--- Movement
-Movement:CreateSection("Movement Settings")
-
-local flyEnabled = false
-local flySpeed = 2
-local flyKeys = {}
-local flyPart
-
-Movement:CreateToggle({Name = "Fly", CurrentValue = false, Callback = function(v)
-    flyEnabled = v
-    local character = LocalPlayer.Character
-    if character then
-        flyPart = character:FindFirstChild("HumanoidRootPart") or character:WaitForChild("HumanoidRootPart")
-        flyPart.Anchored = flyEnabled
-    end
-end})
-
-Movement:CreateSlider({Name = "Fly Speed", Range = {1, 10}, Increment = 1, CurrentValue = flySpeed, Callback = function(v) flySpeed = v end})
-
+-- Fly movement
 UserInputService.InputBegan:Connect(function(input)
     if flyEnabled then flyKeys[input.KeyCode] = true end
 end)
@@ -414,10 +357,20 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- Init
-task.spawn(function()
-    task.wait(0.5)
-    RefreshTargets()
-end)
-
-Rayfield:Notify({Title = "Чит загружен", Content = "ESP + Chams + Aimbot + Fly активны", Duration = 2})
+print([[
+=====================================
+Military Tycoon Script - LOADED
+=====================================
+HOTKEYS:
+  Insert     - Toggle ESP
+  Delete     - Toggle Chams
+  Home       - Toggle Aimbot
+  End        - Select Random Target
+  PageUp     - Teleport to Target
+  PageDown   - Auto Teleport
+  F          - Toggle Fly
+  R          - Show Players
+  +/- (Numpad) - Fly Speed
+  [/]        - FOV
+=====================================
+]])
