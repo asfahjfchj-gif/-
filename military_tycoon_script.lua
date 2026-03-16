@@ -1,7 +1,128 @@
 -- ═══ LOAD NEXUSUI ═══
--- Вставь содержимое NexusUI.lua сюда или загрузи через loadstring
-local NexusUI = loadstring(readfile("NexusUI.lua") or game:HttpGet("https://raw.githubusercontent.com/asfahjfchj-gif/-/refs/heads/main/NexusUI.lua
+local NexusUI = loadstring(readfile("NexusUI.lua") or game:HttpGet("https://raw.githubusercontent.com/asfahjfchj-gif/-/refs/heads/main/NexusUI.lua"))()
 
+-- ═══ LOADING SCREEN ═══
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+-- Loading GUI
+local loadingGui = Instance.new("ScreenGui")
+loadingGui.Name = "LoadingGui"
+loadingGui.ResetOnSpawn = false
+loadingGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+loadingGui.DisplayOrder = 9999
+
+if gethui then loadingGui.Parent = gethui() else loadingGui.Parent = PlayerGui end
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 400, 0, 200)
+mainFrame.Position = UDim2.new(0.5, -200, 0.5, -100)
+mainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = loadingGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 12)
+corner.Parent = mainFrame
+
+local stroke = Instance.new("UIStroke")
+stroke.Color = Color3.fromRGB(130, 90, 255)
+stroke.Thickness = 2
+stroke.Transparency = 0.5
+stroke.Parent = mainFrame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 40)
+title.Position = UDim2.new(0, 0, 0, 10)
+title.BackgroundTransparency = 1
+title.Text = "✦ Military Tycoon"
+title.Font = Enum.Font.GothamBold
+title.TextSize = 20
+title.TextColor3 = Color3.fromRGB(240, 240, 255)
+title.Parent = mainFrame
+
+local subtitle = Instance.new("TextLabel")
+subtitle.Size = UDim2.new(1, 0, 0, 20)
+subtitle.Position = UDim2.new(0, 0, 0, 45)
+subtitle.BackgroundTransparency = 1
+subtitle.Text = "NexusUI Premium Edition"
+subtitle.Font = Enum.Font.Gotham
+subtitle.TextSize = 12
+subtitle.TextColor3 = Color3.fromRGB(160, 160, 190)
+subtitle.Parent = mainFrame
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, 0, 0, 20)
+statusLabel.Position = UDim2.new(0, 0, 0, 80)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "Инициализация..."
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.TextSize = 11
+statusLabel.TextColor3 = Color3.fromRGB(130, 90, 255)
+statusLabel.Parent = mainFrame
+
+local progressBarBg = Instance.new("Frame")
+progressBarBg.Size = UDim2.new(0.8, 0, 0, 8)
+progressBarBg.Position = UDim2.new(0.1, 0, 0, 110)
+progressBarBg.BackgroundColor3 = Color3.fromRGB(32, 32, 48)
+progressBarBg.BorderSizePixel = 0
+progressBarBg.Parent = mainFrame
+
+local progressCorner = Instance.new("UICorner")
+progressCorner.CornerRadius = UDim.new(0, 4)
+progressCorner.Parent = progressBarBg
+
+local progressBar = Instance.new("Frame")
+progressBar.Size = UDim2.new(0, 0, 1, 0)
+progressBar.BackgroundColor3 = Color3.fromRGB(130, 90, 255)
+progressBar.BorderSizePixel = 0
+progressBar.Parent = progressBarBg
+
+local progressCorner2 = Instance.new("UICorner")
+progressCorner2.CornerRadius = UDim.new(0, 4)
+progressCorner2.Parent = progressBar
+
+-- Анимация загрузки
+local function UpdateLoading(progress, status)
+    statusLabel.Text = status
+    local tween = game:GetService("TweenService"):Create(progressBar, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = UDim2.new(progress, 0, 1, 0)})
+    tween:Play()
+end
+
+task.spawn(function()
+    UpdateLoading(0.1, "Загрузка UI...")
+    task.wait(0.3)
+    UpdateLoading(0.3, "Инициализация сервисов...")
+    task.wait(0.2)
+    UpdateLoading(0.5, "Подготовка ESP...")
+    task.wait(0.2)
+    UpdateLoading(0.7, "Настройка визуалов...")
+    task.wait(0.2)
+    UpdateLoading(0.9, "Финализация...")
+    task.wait(0.3)
+    UpdateLoading(1.0, "Готово!")
+    task.wait(0.2)
+    
+    -- Плавное скрытие
+    local tweenService = game:GetService("TweenService")
+    tweenService:Create(mainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {
+        Position = UDim2.new(0.5, -200, 0.5, -150),
+        BackgroundTransparency = 1
+    }):Play()
+    tweenService:Create(title, TweenInfo.new(0.3), {TextTransparency = 1}):Play()
+    tweenService:Create(subtitle, TweenInfo.new(0.3), {TextTransparency = 1}):Play()
+    tweenService:Create(statusLabel, TweenInfo.new(0.3), {TextTransparency = 1}):Play()
+    tweenService:Create(progressBarBg, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
+    
+    task.wait(0.5)
+    loadingGui:Destroy()
+end)
+
+-- ═══ CREATE WINDOW ═══
 local Window = NexusUI:CreateWindow({
     Name = "Military Tycoon | XENO",
     LoadingTitle = "✦ Military Tycoon Cheat",
@@ -9,12 +130,7 @@ local Window = NexusUI:CreateWindow({
     ToggleKey = Enum.KeyCode.RightControl,
 })
 
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
-
 workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
     Camera = workspace.CurrentCamera
 end)
@@ -56,6 +172,10 @@ local tracerColor = Color3.fromRGB(255, 255, 255)
 local showFov = false
 local fovColor = Color3.fromRGB(255, 255, 255)
 
+-- Hitbox Expander
+local hitboxEnabled = false
+local hitboxScale = 1.5
+
 local FOVCircle = Drawing.new("Circle")
 FOVCircle.Thickness = 1
 FOVCircle.Filled = false
@@ -72,8 +192,22 @@ local espRaycastParams = RaycastParams.new()
 espRaycastParams.FilterType = Enum.RaycastFilterType.Exclude
 espRaycastParams.IgnoreWater = true
 
+-- Оптимизированная проверка видимости (кэширование)
+local lastVisibilityCheck = {}
+local lastCheckTime = {}
+local VISIBILITY_CACHE_TIME = 0.1
+
 local function IsVisible(character)
     if not character or not character:FindFirstChild("Head") then return false end
+    
+    local now = tick()
+    local charId = character:GetFullName()
+    
+    -- Кэш проверки видимости
+    if lastVisibilityCheck[charId] ~= nil and (now - lastCheckTime[charId]) < VISIBILITY_CACHE_TIME then
+        return lastVisibilityCheck[charId]
+    end
+    
     local myChar = LocalPlayer.Character
     espRaycastParams.FilterDescendantsInstances = myChar and {myChar} or {}
 
@@ -83,7 +217,11 @@ local function IsVisible(character)
 
     local result = workspace:Raycast(origin, direction, espRaycastParams)
 
-    return not result or result.Instance:IsDescendantOf(character)
+    local isVisible = not result or result.Instance:IsDescendantOf(character)
+    lastVisibilityCheck[charId] = isVisible
+    lastCheckTime[charId] = now
+    
+    return isVisible
 end
 
 local function GetSkeletonJoints(character)
@@ -125,6 +263,43 @@ local function CreateLine()
     line.Visible = false
     return line
 end
+
+-- ═══ HITBOX EXPANDER ═══
+local function SetHitboxScale(character, scale)
+    if not character then return end
+    
+    local head = character:FindFirstChild("Head")
+    if head and head:IsA("BasePart") then
+        head.Size = Vector3.new(2, 2, 2) * scale
+    end
+end
+
+local function ApplyHitboxes()
+    if not hitboxEnabled then return end
+    
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character then
+            SetHitboxScale(plr.Character, hitboxScale)
+        end
+    end
+end
+
+local function ResetHitboxes()
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character then
+            SetHitboxScale(plr.Character, 1)
+        end
+    end
+end
+
+Players.PlayerAdded:Connect(function(plr)
+    plr.CharacterAdded:Connect(function(char)
+        task.wait(0.1)
+        if hitboxEnabled then
+            SetHitboxScale(char, hitboxScale)
+        end
+    end)
+end)
 
 local function CreateESPAndChams(player)
     if player == LocalPlayer then return end
@@ -182,6 +357,11 @@ local function CreateESPAndChams(player)
         highlight.Parent = character
 
         ChamsHighlights[player] = highlight
+        
+        -- Применяем хитбокс при создании
+        if hitboxEnabled then
+            SetHitboxScale(character, hitboxScale)
+        end
     end
 end
 
@@ -232,7 +412,15 @@ local function UpdateSkeleton(player, joints)
     end
 end
 
+-- Оптимизация: обновляем ESP не каждый кадр
+local lastESPUpdate = 0
+local ESP_UPDATE_RATE = 1 / 30  -- 30 FPS вместо 60
+
 local function UpdateESP()
+    local now = tick()
+    if (now - lastESPUpdate) < ESP_UPDATE_RATE then return end
+    lastESPUpdate = now
+    
     for player, objects in pairs(ESPObjects) do
         local character = player.Character
         if character and character:FindFirstChild("HumanoidRootPart") then
@@ -367,7 +555,6 @@ UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton2 then holdingRMB = false end
 end)
 
--- Get closest target in FOV
 local aimbotRaycastParams = RaycastParams.new()
 aimbotRaycastParams.FilterType = Enum.RaycastFilterType.Exclude
 aimbotRaycastParams.IgnoreWater = true
@@ -405,42 +592,29 @@ end
 RunService.RenderStepped:Connect(function()
     local target = selectedTarget
 
-    -- Проверка текущей цели
     if target and target.Character and target.Character:FindFirstChild(aimPart) then
         local pos = Camera:WorldToScreenPoint(target.Character[aimPart].Position)
         local distFromCenter = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
         if distFromCenter > fov then target = nil end
     end
 
-    -- Поиск ближайшей цели если нет текущей
     if not target then
         target = GetClosestTarget()
     end
 
-    -- Silent Aim
     if silentAimEnabled and target and target.Character and target.Character:FindFirstChild(aimPart) then
         local targetPos = target.Character[aimPart].Position
-        local mousePos = UserInputService:GetMouseLocation()
-        
-        -- Calculate angle to target
         local screenPoint = Camera:WorldToScreenPoint(targetPos)
         if screenPoint.Z > 0 then
-            -- Modify mouse position for silent aim
-            -- This affects hitscan weapons
-            local newMousePos = Vector2.new(screenPoint.X, screenPoint.Y)
-            
-            -- Store for hook (if executor supports)
             getgenv().SilentAimTarget = targetPos
         end
     end
 
-    -- Aimbot (camera rotation)
     if aimbotEnabled and holdingRMB and target and target.Character and target.Character:FindFirstChild(aimPart) then
         local targetPos = target.Character[aimPart].Position
         Camera.CFrame = Camera.CFrame:Lerp(CFrame.lookAt(Camera.CFrame.Position, targetPos), smoothness)
     end
 
-    -- Update FOV Circle
     if showFov then
         local mousePos = UserInputService:GetMouseLocation()
         FOVCircle.Position = mousePos
@@ -506,6 +680,35 @@ Combat:CreateDropdown({
     Callback = function(opt) aimPart = opt end
 })
 Combat:CreateLabel("Hold RIGHT MOUSE BUTTON to aim at target")
+
+Combat:CreateDivider()
+Combat:CreateSection("Hitbox Expander")
+
+Combat:CreateToggle({
+    Name = "Увеличить хитбоксы",
+    CurrentValue = hitboxEnabled,
+    Callback = function(v)
+        hitboxEnabled = v
+        if v then
+            ApplyHitboxes()
+        else
+            ResetHitboxes()
+        end
+    end
+})
+
+Combat:CreateSlider({
+    Name = "Размер хитбокса",
+    Range = {1, 5},
+    Increment = 0.1,
+    CurrentValue = hitboxScale,
+    Callback = function(v)
+        hitboxScale = v
+        if hitboxEnabled then
+            ApplyHitboxes()
+        end
+    end
+})
 
 -- Targets
 TargetsTab:CreateSection("Player List")
@@ -654,9 +857,9 @@ RunService.Stepped:Connect(function()
     local humanoid = character:FindFirstChildOfClass("Humanoid")
     if humanoid then
         if walkSpeedEnabled then humanoid.WalkSpeed = walkSpeed end
-        if jumpPowerEnabled then 
-            humanoid.UseJumpPower = true 
-            humanoid.JumpPower = jumpPower 
+        if jumpPowerEnabled then
+            humanoid.UseJumpPower = true
+            humanoid.JumpPower = jumpPower
         end
     end
 
@@ -683,4 +886,4 @@ task.spawn(function()
     RefreshTargets()
 end)
 
-NexusUI:Notify({Title = "✦ Чит загружен", Content = "ESP + Skeleton + Silent Aim + Low Health активны", Duration = 4, Image = "success"})
+NexusUI:Notify({Title = "✦ Чит загружен", Content = "ESP + Hitbox + Optimized", Duration = 4, Image = "success"})
