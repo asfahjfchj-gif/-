@@ -3354,7 +3354,7 @@ end)
 -- ============================================================
 task.spawn(function()
     local ok, err = pcall(function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/USERNAME/REPO/main/emotes.lua"))()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/asfahjfchj-gif/-/refs/heads/main/emotes.lua"))()
     end)
     if not ok then
         -- Фоллбэк: попробовать локально
