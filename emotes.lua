@@ -1124,353 +1124,447 @@ local function GetFavList()
 end
 local function Thumb(id) return "rbxthumb://type=Asset&id=" .. tostring(id) .. "&w=150&h=150" end
 
--- ========== GUI ==========
-if guiParent:FindFirstChild("EmoteWheelX") then guiParent.EmoteWheelX:Destroy() end
-local gui = Instance.new("ScreenGui", guiParent)
-gui.Name = "EmoteWheelX"
-gui.ResetOnSpawn = false
-gui.IgnoreGuiInset = true
-gui.DisplayOrder = 101
-
-local isOpen = false
-local curPage = 1
-local PER = 8
-local searchTxt = ""
-
-local function corner(i, r) local c = Instance.new("UICorner", i); c.CornerRadius = UDim.new(0, r or 8) end
-local function stk(i, col, tr, th) local s = Instance.new("UIStroke", i); s.Color = col or S.stroke; s.Transparency = tr or 0.4; s.Thickness = th or 1; return s end
-
-local function Filtered()
-    local r, f = {}, searchTxt:lower()
-    for _, e in ipairs(AllEmotes) do
-        if f == "" or e.name:lower():find(f, 1, true) then table.insert(r, e) end
+-- ========== RECENT ==========
+if not getgenv().__EmoteRecent then getgenv().__EmoteRecent = {} end
+local Recent = getgenv().__EmoteRecent
+local MAX_RECENT = 20
+local function AddRecent(name)
+    for i, v in ipairs(Recent) do if v == name then table.remove(Recent, i); break end end
+    table.insert(Recent, 1, name)
+    while #Recent > MAX_RECENT do table.remove(Recent) end
+end
+local function GetRecentList()
+    local r = {}
+    for _, n in ipairs(Recent) do
+        for _, e in ipairs(AllEmotes) do if e.name == n then table.insert(r, e); break end end
     end
     return r
 end
-local function NumPages(list) return math.max(1, math.ceil(#list / PER)) end
 
--- Root
+-- ========== GUI ==========
+if guiParent:FindFirstChild("EmoteWheelX") then guiParent.EmoteWheelX:Destroy() end
+local gui = Instance.new("ScreenGui", guiParent)
+gui.Name = "EmoteWheelX"; gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true; gui.DisplayOrder = 101
+
+local isOpen = false
+local searchTxt = ""
+local activeTab = "all" -- "all", "fav", "recent"
+
+local function corner(p, r) local c = Instance.new("UICorner", p); c.CornerRadius = UDim.new(0, r or 8) end
+local function stk(p, col, tr, th) local s = Instance.new("UIStroke", p); s.Color = col or S.stroke; s.Transparency = tr or 0.4; s.Thickness = th or 1; return s end
+local function tw(obj, t, props) return TweenService:Create(obj, TweenInfo.new(t, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), props) end
+
+-- Root overlay
 local root = Instance.new("Frame", gui)
-root.Size = UDim2.new(1, 0, 1, 0); root.BackgroundTransparency = 1; root.Visible = false
+root.Size = UDim2.new(1,0,1,0); root.BackgroundTransparency = 1; root.Visible = false
 
 local dim = Instance.new("TextButton", root)
-dim.Size = UDim2.new(1, 0, 1, 0); dim.BackgroundColor3 = Color3.new(0, 0, 0)
-dim.BackgroundTransparency = 0.55; dim.BorderSizePixel = 0; dim.Text = ""; dim.ZIndex = 1
+dim.Size = UDim2.new(1,0,1,0); dim.BackgroundColor3 = Color3.new(0,0,0)
+dim.BackgroundTransparency = 0.5; dim.BorderSizePixel = 0; dim.Text = ""; dim.ZIndex = 1
 
--- Wheel frame
-local WR, CR = 195, 50
-local wBg = Instance.new("Frame", root)
-wBg.Name = "WBg"; wBg.Size = UDim2.new(0, WR*2+30, 0, WR*2+90)
-wBg.Position = UDim2.new(0.5, -(WR+15)-140, 0.5, -(WR+45))
-wBg.BackgroundColor3 = S.panel; wBg.BackgroundTransparency = 0.02; wBg.ZIndex = 2
-corner(wBg, 16); stk(wBg, S.accent, 0.2, 1.5)
-local wGr = Instance.new("UIGradient", wBg)
-wGr.Color = ColorSequence.new(Color3.fromRGB(16,12,32), Color3.fromRGB(6,4,14)); wGr.Rotation = 160
+-- ========== MAIN PANEL ==========
+local PW, PH = 520, 480
+local panel = Instance.new("Frame", root)
+panel.Name = "Panel"; panel.Size = UDim2.new(0, PW, 0, PH)
+panel.Position = UDim2.new(0.5, -PW/2, 0.5, -PH/2)
+panel.BackgroundColor3 = S.panel; panel.BackgroundTransparency = 0; panel.ZIndex = 2
+panel.ClipsDescendants = true
+corner(panel, 14)
+local pStk = stk(panel, S.accent, 0.15, 1.5)
+local pGr = Instance.new("UIGradient", panel)
+pGr.Color = ColorSequence.new(Color3.fromRGB(16,12,32), Color3.fromRGB(6,4,14)); pGr.Rotation = 160
 
--- Title
-local ttl = Instance.new("TextLabel", wBg)
-ttl.Size = UDim2.new(1,0,0,28); ttl.Position = UDim2.new(0,0,0,6)
-ttl.BackgroundTransparency = 1; ttl.Text = "EMOTE WHEEL (996)"
-ttl.TextColor3 = S.accent; ttl.Font = Enum.Font.GothamBlack; ttl.TextSize = 14; ttl.ZIndex = 3
+-- ========== DRAGGING ==========
+local dragging, dragStart, startPos = false, nil, nil
+local titleBar = Instance.new("Frame", panel)
+titleBar.Size = UDim2.new(1,0,0,38); titleBar.BackgroundTransparency = 1; titleBar.ZIndex = 10
 
--- Search
-local sBox = Instance.new("TextBox", wBg)
-sBox.Size = UDim2.new(1,-20,0,26); sBox.Position = UDim2.new(0,10,0,34)
-sBox.BackgroundColor3 = S.inputBg; sBox.BackgroundTransparency = 0.06
-sBox.TextColor3 = S.textMain; sBox.PlaceholderText = "Search..."
-sBox.PlaceholderColor3 = S.textSoft; sBox.Font = Enum.Font.GothamSemibold
-sBox.TextSize = 11; sBox.ClearTextOnFocus = false; sBox.Text = ""; sBox.ZIndex = 3
+local dragBtn = Instance.new("TextButton", titleBar)
+dragBtn.Size = UDim2.new(1,-36,1,0); dragBtn.BackgroundTransparency = 1; dragBtn.Text = ""; dragBtn.ZIndex = 10
+dragBtn.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true; dragStart = input.Position; startPos = panel.Position
+    end
+end)
+dragBtn.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        panel.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- ========== HEADER ==========
+local hdr = Instance.new("Frame", panel)
+hdr.Size = UDim2.new(1,0,0,38); hdr.BackgroundColor3 = Color3.fromRGB(14,10,28)
+hdr.BackgroundTransparency = 0; hdr.ZIndex = 5
+local hGr = Instance.new("UIGradient", hdr)
+hGr.Color = ColorSequence.new(Color3.fromRGB(20,14,40), Color3.fromRGB(10,6,22)); hGr.Rotation = 90
+
+-- Accent line under header
+local hLine = Instance.new("Frame", panel)
+hLine.Size = UDim2.new(1,0,0,2); hLine.Position = UDim2.new(0,0,0,38)
+hLine.BackgroundColor3 = S.accent; hLine.BackgroundTransparency = 0.4
+hLine.BorderSizePixel = 0; hLine.ZIndex = 6
+
+local ttl = Instance.new("TextLabel", hdr)
+ttl.Size = UDim2.new(0,180,1,0); ttl.Position = UDim2.new(0,14,0,0)
+ttl.BackgroundTransparency = 1; ttl.Text = "EMOTE WHEEL"
+ttl.TextColor3 = S.accent; ttl.Font = Enum.Font.GothamBlack; ttl.TextSize = 15
+ttl.TextXAlignment = Enum.TextXAlignment.Left; ttl.ZIndex = 6
+
+local countLbl = Instance.new("TextLabel", hdr)
+countLbl.Size = UDim2.new(0,60,0,16); countLbl.Position = UDim2.new(0,148,0,11)
+countLbl.BackgroundColor3 = S.accent; countLbl.BackgroundTransparency = 0.75
+countLbl.Text = tostring(#AllEmotes); countLbl.TextColor3 = S.accent
+countLbl.Font = Enum.Font.GothamBold; countLbl.TextSize = 9; countLbl.ZIndex = 6
+corner(countLbl, 4)
+
+-- Close button
+local closeBtn = Instance.new("TextButton", hdr)
+closeBtn.Size = UDim2.new(0,28,0,28); closeBtn.Position = UDim2.new(1,-34,0,5)
+closeBtn.BackgroundColor3 = S.danger; closeBtn.BackgroundTransparency = 0.7
+closeBtn.Text = "✕"; closeBtn.TextColor3 = S.danger; closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 14; closeBtn.ZIndex = 7
+corner(closeBtn, 6)
+closeBtn.MouseEnter:Connect(function() tw(closeBtn, 0.12, {BackgroundTransparency=0.3}):Play() end)
+closeBtn.MouseLeave:Connect(function() tw(closeBtn, 0.12, {BackgroundTransparency=0.7}):Play() end)
+
+-- ========== TOOLBAR (search + controls) ==========
+local toolbar = Instance.new("Frame", panel)
+toolbar.Size = UDim2.new(1,-16,0,32); toolbar.Position = UDim2.new(0,8,0,46)
+toolbar.BackgroundTransparency = 1; toolbar.ZIndex = 5
+
+-- Search box
+local sBox = Instance.new("TextBox", toolbar)
+sBox.Size = UDim2.new(1,-170,1,0); sBox.BackgroundColor3 = S.inputBg
+sBox.BackgroundTransparency = 0; sBox.TextColor3 = S.textMain
+sBox.PlaceholderText = "Search emotes..."; sBox.PlaceholderColor3 = S.textSoft
+sBox.Font = Enum.Font.GothamSemibold; sBox.TextSize = 11
+sBox.ClearTextOnFocus = false; sBox.Text = ""; sBox.ZIndex = 6
+sBox.TextXAlignment = Enum.TextXAlignment.Left; sBox.TextPadding = nil
 corner(sBox, 6); stk(sBox, S.stroke, 0.55, 1)
+-- Manual text padding via UIPadding
+local sPad = Instance.new("UIPadding", sBox)
+sPad.PaddingLeft = UDim.new(0, 8)
 
--- Canvas
-local canvas = Instance.new("Frame", wBg)
-canvas.Name = "C"; canvas.Size = UDim2.new(0, WR*2, 0, WR*2)
-canvas.Position = UDim2.new(0.5, -WR, 0, 66)
-canvas.BackgroundTransparency = 1; canvas.ClipsDescendants = false; canvas.ZIndex = 3
+-- Stop button
+local stopBtn = Instance.new("TextButton", toolbar)
+stopBtn.Size = UDim2.new(0,56,1,0); stopBtn.Position = UDim2.new(1,-164,0,0)
+stopBtn.BackgroundColor3 = S.danger; stopBtn.BackgroundTransparency = 0.55
+stopBtn.Text = "STOP"; stopBtn.TextColor3 = Color3.fromRGB(255,200,210)
+stopBtn.Font = Enum.Font.GothamBold; stopBtn.TextSize = 10; stopBtn.ZIndex = 6
+corner(stopBtn, 6); stk(stopBtn, S.danger, 0.5, 1)
+stopBtn.MouseEnter:Connect(function() tw(stopBtn, 0.1, {BackgroundTransparency=0.2}):Play() end)
+stopBtn.MouseLeave:Connect(function() tw(stopBtn, 0.1, {BackgroundTransparency=0.55}):Play() end)
+stopBtn.MouseButton1Click:Connect(function() StopCur(); StopPrev() end)
 
--- Center STOP
-local ctr = Instance.new("Frame", canvas)
-ctr.Size = UDim2.new(0, CR*2, 0, CR*2); ctr.Position = UDim2.new(0.5, -CR, 0.5, -CR)
-ctr.BackgroundColor3 = S.center; ctr.BackgroundTransparency = 0.02; ctr.ZIndex = 10
-corner(ctr, CR); stk(ctr, S.accent, 0.25, 1.5)
-local cTxt = Instance.new("TextLabel", ctr)
-cTxt.Size = UDim2.new(1,0,1,0); cTxt.BackgroundTransparency = 1; cTxt.Text = "STOP"
-cTxt.TextColor3 = S.danger; cTxt.Font = Enum.Font.GothamBold; cTxt.TextSize = 12; cTxt.ZIndex = 11
-local cBtn = Instance.new("TextButton", ctr)
-cBtn.Size = UDim2.new(1,0,1,0); cBtn.BackgroundTransparency = 1; cBtn.Text = ""; cBtn.ZIndex = 12
-cBtn.MouseButton1Click:Connect(function() StopCur(); StopPrev() end)
-cBtn.MouseEnter:Connect(function() TweenService:Create(ctr, TweenInfo.new(0.12), {BackgroundColor3=S.panelSoft}):Play() end)
-cBtn.MouseLeave:Connect(function() TweenService:Create(ctr, TweenInfo.new(0.12), {BackgroundColor3=S.center}):Play() end)
-
--- Loop label (center)
-local loopLbl = Instance.new("TextLabel", ctr)
-loopLbl.Size = UDim2.new(1,0,0,12); loopLbl.Position = UDim2.new(0,0,1,-14)
-loopLbl.BackgroundTransparency = 1; loopLbl.Text = ""; loopLbl.TextColor3 = S.fav
-loopLbl.Font = Enum.Font.GothamBold; loopLbl.TextSize = 8; loopLbl.ZIndex = 11
-
--- Pagination
-local pgBar = Instance.new("Frame", wBg)
-pgBar.Size = UDim2.new(1,-20,0,28); pgBar.Position = UDim2.new(0,10,1,-34)
-pgBar.BackgroundTransparency = 1; pgBar.ZIndex = 3
-
-local prevBtn = Instance.new("TextButton", pgBar)
-prevBtn.Size = UDim2.new(0,42,1,0); prevBtn.BackgroundColor3 = S.btnBg
-prevBtn.BackgroundTransparency = 0.1; prevBtn.Text = "<"
-prevBtn.TextColor3 = S.textMain; prevBtn.Font = Enum.Font.GothamBold
-prevBtn.TextSize = 14; prevBtn.ZIndex = 4
-corner(prevBtn, 6); stk(prevBtn, S.stroke, 0.55, 1)
-
-local pgLbl = Instance.new("TextLabel", pgBar)
-pgLbl.Size = UDim2.new(1,-96,1,0); pgLbl.Position = UDim2.new(0,46,0,0)
-pgLbl.BackgroundTransparency = 1; pgLbl.Text = "1/1"; pgLbl.TextColor3 = S.textSoft
-pgLbl.Font = Enum.Font.GothamSemibold; pgLbl.TextSize = 11; pgLbl.ZIndex = 4
-
-local nextBtn = Instance.new("TextButton", pgBar)
-nextBtn.Size = UDim2.new(0,42,1,0); nextBtn.Position = UDim2.new(1,-42,0,0)
-nextBtn.BackgroundColor3 = S.btnBg; nextBtn.BackgroundTransparency = 0.1; nextBtn.Text = ">"
-nextBtn.TextColor3 = S.textMain; nextBtn.Font = Enum.Font.GothamBold
-nextBtn.TextSize = 14; nextBtn.ZIndex = 4
-corner(nextBtn, 6); stk(nextBtn, S.stroke, 0.55, 1)
-
--- Loop button (bottom left of wheel)
-local loopBtn = Instance.new("TextButton", wBg)
-loopBtn.Size = UDim2.new(0, 70, 0, 22)
-loopBtn.Position = UDim2.new(0, 10, 1, -62)
-loopBtn.BackgroundColor3 = S.btnBg; loopBtn.BackgroundTransparency = 0.1
+-- Loop button
+local loopBtn = Instance.new("TextButton", toolbar)
+loopBtn.Size = UDim2.new(0,72,1,0); loopBtn.Position = UDim2.new(1,-104,0,0)
+loopBtn.BackgroundColor3 = S.btnBg; loopBtn.BackgroundTransparency = 0
 loopBtn.Text = "Loop: OFF"; loopBtn.TextColor3 = S.textSoft
-loopBtn.Font = Enum.Font.GothamBold; loopBtn.TextSize = 10; loopBtn.ZIndex = 4
-corner(loopBtn, 6); stk(loopBtn, S.stroke, 0.55, 1)
-loopBtn.MouseButton1Click:Connect(function()
-    emoteLoop = not emoteLoop
-    loopBtn.Text = emoteLoop and "Loop: ON" or "Loop: OFF"
-    loopBtn.TextColor3 = emoteLoop and S.fav or S.textSoft
-    loopLbl.Text = emoteLoop and "LOOP" or ""
-    if curTrack then curTrack.Looped = emoteLoop end
+loopBtn.Font = Enum.Font.GothamBold; loopBtn.TextSize = 10; loopBtn.ZIndex = 6
+corner(loopBtn, 6)
+local loopStk = stk(loopBtn, S.stroke, 0.55, 1)
+
+-- Random button
+local randBtn = Instance.new("TextButton", toolbar)
+randBtn.Size = UDim2.new(0,28,1,0); randBtn.Position = UDim2.new(1,-28,0,0)
+randBtn.BackgroundColor3 = S.btnBg; randBtn.BackgroundTransparency = 0
+randBtn.Text = "🎲"; randBtn.TextColor3 = S.textMain
+randBtn.Font = Enum.Font.GothamBold; randBtn.TextSize = 14; randBtn.ZIndex = 6
+corner(randBtn, 6); stk(randBtn, S.stroke, 0.55, 1)
+randBtn.MouseEnter:Connect(function() tw(randBtn, 0.08, {BackgroundColor3=S.btnHover}):Play() end)
+randBtn.MouseLeave:Connect(function() tw(randBtn, 0.08, {BackgroundColor3=S.btnBg}):Play() end)
+randBtn.MouseButton1Click:Connect(function()
+    local e = AllEmotes[math.random(1, #AllEmotes)]
+    if e then PlayAnim(e, false); AddRecent(e.name) end
 end)
 
--- ========== FAVORITES PANEL ==========
-local FW = 250
-local fPan = Instance.new("Frame", root)
-fPan.Name = "Fav"; fPan.Size = UDim2.new(0, FW, 0, WR*2+90)
-fPan.Position = UDim2.new(0.5, WR+15-120, 0.5, -(WR+45))
-fPan.BackgroundColor3 = S.panel; fPan.BackgroundTransparency = 0.02; fPan.ZIndex = 2
-corner(fPan, 14); stk(fPan, S.accent, 0.2, 1.5)
-local fGr = Instance.new("UIGradient", fPan)
-fGr.Color = ColorSequence.new(Color3.fromRGB(16,12,32), Color3.fromRGB(6,4,14)); fGr.Rotation = 160
+-- ========== TABS ==========
+local tabBar = Instance.new("Frame", panel)
+tabBar.Size = UDim2.new(1,-16,0,28); tabBar.Position = UDim2.new(0,8,0,84)
+tabBar.BackgroundTransparency = 1; tabBar.ZIndex = 5
 
-local fHdr = Instance.new("Frame", fPan)
-fHdr.Size = UDim2.new(1,-12,0,36); fHdr.Position = UDim2.new(0,6,0,6)
-fHdr.BackgroundColor3 = Color3.fromRGB(18,14,34); fHdr.BackgroundTransparency = 0.02; fHdr.ZIndex = 3
-corner(fHdr, 10); stk(fHdr, S.stroke, 0.5, 1)
+local tabDefs = {
+    {key="all",    text="All",       icon=""},
+    {key="fav",    text="★ Favorites", icon=""},
+    {key="recent", text="Recent",    icon=""},
+}
+local tabBtns = {}
 
-local fTtl = Instance.new("TextLabel", fHdr)
-fTtl.Size = UDim2.new(1,-40,1,0); fTtl.Position = UDim2.new(0,6,0,0)
-fTtl.BackgroundTransparency = 1; fTtl.Text = "★ FAVORITES"
-fTtl.TextColor3 = S.fav; fTtl.Font = Enum.Font.GothamBold
-fTtl.TextSize = 12; fTtl.TextXAlignment = Enum.TextXAlignment.Left; fTtl.ZIndex = 4
-
-local fCnt = Instance.new("TextLabel", fHdr)
-fCnt.Size = UDim2.new(0,30,1,0); fCnt.Position = UDim2.new(1,-34,0,0)
-fCnt.BackgroundTransparency = 1; fCnt.Text = "0"; fCnt.TextColor3 = S.textSoft
-fCnt.Font = Enum.Font.GothamSemibold; fCnt.TextSize = 10; fCnt.ZIndex = 4
-
-local fScr = Instance.new("ScrollingFrame", fPan)
-fScr.Size = UDim2.new(1,-12,1,-50); fScr.Position = UDim2.new(0,6,0,46)
-fScr.BackgroundTransparency = 1; fScr.BorderSizePixel = 0
-fScr.ScrollBarThickness = 3; fScr.ScrollBarImageColor3 = S.accent; fScr.ZIndex = 3
-local fLay = Instance.new("UIListLayout", fScr)
-fLay.SortOrder = Enum.SortOrder.LayoutOrder; fLay.Padding = UDim.new(0, 3)
-fLay:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    fScr.CanvasSize = UDim2.new(0,0,0, fLay.AbsoluteContentSize.Y + 4)
-end)
-
--- ========== SEGMENTS ==========
-local segs = {}
-local function ClearSegs()
-    for _, f in ipairs(segs) do f:Destroy() end
-    segs = {}
+for i, td in ipairs(tabDefs) do
+    local tb = Instance.new("TextButton", tabBar)
+    tb.Size = UDim2.new(0, i == 2 and 100 or 70, 1, 0)
+    tb.Position = UDim2.new(0, (i==1 and 0) or (i==2 and 74) or 178, 0, 0)
+    tb.BackgroundColor3 = S.btnBg; tb.BackgroundTransparency = 0
+    tb.Text = td.text; tb.TextColor3 = S.textSoft
+    tb.Font = Enum.Font.GothamBold; tb.TextSize = 10; tb.ZIndex = 6
+    corner(tb, 6)
+    local ts = stk(tb, S.stroke, 0.6, 1)
+    tabBtns[td.key] = {btn = tb, stk = ts}
 end
 
-local RefreshFavs -- fwd
+local RefreshGrid -- forward
 
-local function MakeSeg(emote, idx, total)
-    local ang = (math.pi * 2 / total) * (idx - 1) - math.pi / 2
-    local rad = WR - 56
-    local sw = math.clamp(125 - total * 2, 82, 125)
-    local sh = 80
-    local cx, cy = WR, WR
-    local px = cx + math.cos(ang) * rad - sw / 2
-    local py = cy + math.sin(ang) * rad - sh / 2
-
-    local seg = Instance.new("Frame", canvas)
-    seg.Size = UDim2.new(0, sw, 0, sh)
-    seg.Position = UDim2.new(0, px, 0, py)
-    seg.BackgroundColor3 = S.btnBg; seg.BackgroundTransparency = 0.06; seg.ZIndex = 5
-    corner(seg, 10)
-    local ss = stk(seg, S.stroke, 0.5, 1)
-
-    -- Line
-    local lx1 = cx + math.cos(ang) * (CR + 3)
-    local ly1 = cy + math.sin(ang) * (CR + 3)
-    local lx2 = cx + math.cos(ang) * (rad - sh/2 + 4)
-    local ly2 = cy + math.sin(ang) * (rad - sh/2 + 4)
-    local d = math.sqrt((lx2-lx1)^2 + (ly2-ly1)^2)
-    if d > 4 then
-        local ln = Instance.new("Frame", canvas)
-        ln.Size = UDim2.new(0, d, 0, 1)
-        ln.Position = UDim2.new(0, (lx1+lx2)/2-d/2, 0, (ly1+ly2)/2)
-        ln.Rotation = math.deg(math.atan2(ly2-ly1, lx2-lx1))
-        ln.BackgroundColor3 = S.stroke; ln.BackgroundTransparency = 0.7
-        ln.BorderSizePixel = 0; ln.ZIndex = 3
-        table.insert(segs, ln)
+local function SetTab(key)
+    activeTab = key
+    for k, v in pairs(tabBtns) do
+        if k == key then
+            tw(v.btn, 0.15, {BackgroundColor3=S.btnActive, BackgroundTransparency=0}):Play()
+            v.btn.TextColor3 = S.textMain; v.stk.Color = S.accent; v.stk.Transparency = 0.15
+        else
+            tw(v.btn, 0.15, {BackgroundColor3=S.btnBg, BackgroundTransparency=0}):Play()
+            v.btn.TextColor3 = S.textSoft; v.stk.Color = S.stroke; v.stk.Transparency = 0.6
+        end
     end
+    if RefreshGrid then RefreshGrid() end
+end
 
-    local ico = Instance.new("ImageLabel", seg)
-    ico.Size = UDim2.new(0,40,0,40); ico.Position = UDim2.new(0.5,-20,0,3)
-    ico.BackgroundTransparency = 1; ico.Image = Thumb(emote.id); ico.ZIndex = 6
-    corner(ico, 6)
+for k, v in pairs(tabBtns) do
+    v.btn.MouseButton1Click:Connect(function() SetTab(k) end)
+end
 
-    local nm = Instance.new("TextLabel", seg)
-    nm.Size = UDim2.new(1,-4,0,14); nm.Position = UDim2.new(0,2,0,45)
+-- ========== "NOW PLAYING" BAR ==========
+local npBar = Instance.new("Frame", panel)
+npBar.Size = UDim2.new(1,-16,0,30); npBar.Position = UDim2.new(0,8,1,-36)
+npBar.BackgroundColor3 = Color3.fromRGB(18,14,34); npBar.BackgroundTransparency = 0; npBar.ZIndex = 5
+corner(npBar, 8); stk(npBar, S.stroke, 0.55, 1)
+
+local npIcon = Instance.new("TextLabel", npBar)
+npIcon.Size = UDim2.new(0,20,1,0); npIcon.Position = UDim2.new(0,6,0,0)
+npIcon.BackgroundTransparency = 1; npIcon.Text = "▶"; npIcon.TextColor3 = S.accent
+npIcon.Font = Enum.Font.GothamBold; npIcon.TextSize = 11; npIcon.ZIndex = 6
+
+local npLbl = Instance.new("TextLabel", npBar)
+npLbl.Size = UDim2.new(1,-80,1,0); npLbl.Position = UDim2.new(0,26,0,0)
+npLbl.BackgroundTransparency = 1; npLbl.Text = "Nothing playing"
+npLbl.TextColor3 = S.textSoft; npLbl.Font = Enum.Font.GothamSemibold; npLbl.TextSize = 10
+npLbl.TextXAlignment = Enum.TextXAlignment.Left; npLbl.TextTruncate = Enum.TextTruncate.AtEnd; npLbl.ZIndex = 6
+
+local loopInd = Instance.new("TextLabel", npBar)
+loopInd.Size = UDim2.new(0,40,0,16); loopInd.Position = UDim2.new(1,-50,0,7)
+loopInd.BackgroundColor3 = S.fav; loopInd.BackgroundTransparency = 0.75
+loopInd.Text = "LOOP"; loopInd.TextColor3 = S.fav; loopInd.Visible = false
+loopInd.Font = Enum.Font.GothamBold; loopInd.TextSize = 8; loopInd.ZIndex = 6
+corner(loopInd, 4)
+
+-- ========== GRID AREA ==========
+local gridScr = Instance.new("ScrollingFrame", panel)
+gridScr.Size = UDim2.new(1,-16,1,-156); gridScr.Position = UDim2.new(0,8,0,118)
+gridScr.BackgroundTransparency = 1; gridScr.BorderSizePixel = 0
+gridScr.ScrollBarThickness = 4; gridScr.ScrollBarImageColor3 = S.accent
+gridScr.ZIndex = 4; gridScr.ClipsDescendants = true
+
+local gridLayout = Instance.new("UIGridLayout", gridScr)
+gridLayout.CellSize = UDim2.new(0, 118, 0, 88)
+gridLayout.CellPadding = UDim2.new(0, 6, 0, 6)
+gridLayout.SortOrder = Enum.SortOrder.LayoutOrder
+gridLayout.FillDirection = Enum.FillDirection.Horizontal
+gridLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+gridLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    gridScr.CanvasSize = UDim2.new(0,0,0, gridLayout.AbsoluteContentSize.Y + 8)
+end)
+
+local gridPad = Instance.new("UIPadding", gridScr)
+gridPad.PaddingTop = UDim.new(0, 2); gridPad.PaddingLeft = UDim.new(0, 2)
+
+-- ========== EMOTE CARD ==========
+local function GetSourceList()
+    if activeTab == "fav" then return GetFavList()
+    elseif activeTab == "recent" then return GetRecentList()
+    else return AllEmotes end
+end
+
+local function Filtered()
+    local src = GetSourceList()
+    if searchTxt == "" then return src end
+    local f = searchTxt:lower()
+    local r = {}
+    for _, e in ipairs(src) do
+        if e.name:lower():find(f, 1, true) then table.insert(r, e) end
+    end
+    return r
+end
+
+local nowPlayingName = ""
+local function UpdateNP(name)
+    nowPlayingName = name
+    if name ~= "" then
+        npLbl.Text = name; npLbl.TextColor3 = S.textMain; npIcon.Text = "▶"
+    else
+        npLbl.Text = "Nothing playing"; npLbl.TextColor3 = S.textSoft; npIcon.Text = "■"
+    end
+end
+
+local function MakeCard(emote, order)
+    local card = Instance.new("Frame", gridScr)
+    card.Name = "E_" .. order; card.LayoutOrder = order
+    card.BackgroundColor3 = S.btnBg; card.BackgroundTransparency = 0; card.ZIndex = 5
+    corner(card, 8)
+    local cs = stk(card, S.stroke, 0.55, 1)
+
+    -- Thumbnail
+    local thumb = Instance.new("ImageLabel", card)
+    thumb.Size = UDim2.new(0,46,0,46); thumb.Position = UDim2.new(0.5,-23,0,4)
+    thumb.BackgroundColor3 = S.inputBg; thumb.BackgroundTransparency = 0; thumb.ZIndex = 6
+    thumb.Image = Thumb(emote.id); thumb.ScaleType = Enum.ScaleType.Fit
+    corner(thumb, 8)
+
+    -- Name
+    local nm = Instance.new("TextLabel", card)
+    nm.Size = UDim2.new(1,-8,0,14); nm.Position = UDim2.new(0,4,0,52)
     nm.BackgroundTransparency = 1; nm.Text = emote.name
     nm.TextColor3 = S.textMain; nm.Font = Enum.Font.GothamSemibold
     nm.TextSize = 8; nm.TextTruncate = Enum.TextTruncate.AtEnd; nm.ZIndex = 6
 
-    local fvB = Instance.new("TextButton", seg)
-    fvB.Size = UDim2.new(0,18,0,18); fvB.Position = UDim2.new(1,-20,0,60)
-    fvB.BackgroundTransparency = 1
-    fvB.Text = IsFav(emote.name) and "★" or "☆"
-    fvB.TextColor3 = IsFav(emote.name) and S.fav or S.textSoft
-    fvB.Font = Enum.Font.GothamBold; fvB.TextSize = 12; fvB.ZIndex = 8
+    -- Favorite star
+    local fav = Instance.new("TextButton", card)
+    fav.Size = UDim2.new(0,18,0,18); fav.Position = UDim2.new(0,2,0,68)
+    fav.BackgroundTransparency = 1
+    fav.Text = IsFav(emote.name) and "★" or "☆"
+    fav.TextColor3 = IsFav(emote.name) and S.fav or S.textSoft
+    fav.Font = Enum.Font.GothamBold; fav.TextSize = 12; fav.ZIndex = 8
 
-    local cB = Instance.new("TextButton", seg)
-    cB.Size = UDim2.new(1,0,0,60); cB.BackgroundTransparency = 1; cB.Text = ""; cB.ZIndex = 9
-    cB.MouseEnter:Connect(function()
-        TweenService:Create(seg, TweenInfo.new(0.1), {BackgroundColor3=S.btnHover, BackgroundTransparency=0}):Play()
-        ss.Color = S.accent; ss.Transparency = 0.12
+    -- Play indicator
+    local playInd = Instance.new("TextLabel", card)
+    playInd.Size = UDim2.new(0,14,0,14); playInd.Position = UDim2.new(1,-16,0,70)
+    playInd.BackgroundTransparency = 1; playInd.Text = "▶"
+    playInd.TextColor3 = S.accent; playInd.TextTransparency = 1
+    playInd.Font = Enum.Font.GothamBold; playInd.TextSize = 10; playInd.ZIndex = 8
+
+    -- Hover zone
+    local hBtn = Instance.new("TextButton", card)
+    hBtn.Size = UDim2.new(1,0,0,66); hBtn.BackgroundTransparency = 1
+    hBtn.Text = ""; hBtn.ZIndex = 9
+
+    hBtn.MouseEnter:Connect(function()
+        tw(card, 0.1, {BackgroundColor3=S.btnHover}):Play()
+        cs.Color = S.accent; cs.Transparency = 0.1
+        tw(playInd, 0.1, {TextTransparency=0}):Play()
         PlayAnim(emote, true)
     end)
-    cB.MouseLeave:Connect(function()
-        TweenService:Create(seg, TweenInfo.new(0.1), {BackgroundColor3=S.btnBg, BackgroundTransparency=0.06}):Play()
-        ss.Color = S.stroke; ss.Transparency = 0.5
+    hBtn.MouseLeave:Connect(function()
+        tw(card, 0.1, {BackgroundColor3=S.btnBg}):Play()
+        cs.Color = S.stroke; cs.Transparency = 0.55
+        tw(playInd, 0.1, {TextTransparency=1}):Play()
         StopPrev()
     end)
-    cB.MouseButton1Click:Connect(function() PlayAnim(emote, false) end)
-
-    fvB.MouseButton1Click:Connect(function()
-        TogFav(emote.name)
-        fvB.Text = IsFav(emote.name) and "★" or "☆"
-        fvB.TextColor3 = IsFav(emote.name) and S.fav or S.textSoft
-        RefreshFavs()
+    hBtn.MouseButton1Click:Connect(function()
+        PlayAnim(emote, false)
+        AddRecent(emote.name)
+        UpdateNP(emote.name)
+        -- Flash accent
+        tw(card, 0.08, {BackgroundColor3=S.btnActive}):Play()
+        task.delay(0.15, function() tw(card, 0.2, {BackgroundColor3=S.btnHover}):Play() end)
     end)
 
-    table.insert(segs, seg)
+    fav.MouseButton1Click:Connect(function()
+        TogFav(emote.name)
+        fav.Text = IsFav(emote.name) and "★" or "☆"
+        fav.TextColor3 = IsFav(emote.name) and S.fav or S.textSoft
+    end)
+
+    return card
 end
 
-local function RefreshWheel()
-    ClearSegs()
+function RefreshGrid()
+    for _, ch in ipairs(gridScr:GetChildren()) do
+        if ch:IsA("Frame") then ch:Destroy() end
+    end
     local list = Filtered()
-    local pg = NumPages(list)
-    if curPage > pg then curPage = pg end
-    if curPage < 1 then curPage = 1 end
-    pgLbl.Text = curPage .. " / " .. pg .. "  (" .. #list .. ")"
-    local si = (curPage - 1) * PER + 1
-    local ei = math.min(si + PER - 1, #list)
-    for i = si, ei do MakeSeg(list[i], i - si + 1, ei - si + 1) end
-end
-
-function RefreshFavs()
-    for _, ch in ipairs(fScr:GetChildren()) do if ch:IsA("Frame") then ch:Destroy() end end
-    local fl = GetFavList()
-    fCnt.Text = tostring(#fl)
-    if #fl == 0 then
-        local w = Instance.new("Frame", fScr)
-        w.Size = UDim2.new(1,-4,0,48); w.BackgroundTransparency = 1
-        local t = Instance.new("TextLabel", w)
-        t.Size = UDim2.new(1,0,1,0); t.BackgroundTransparency = 1
-        t.Text = "Нет избранных\nНажми ★"; t.TextColor3 = S.textSoft
-        t.Font = Enum.Font.Gotham; t.TextSize = 10
+    if #list == 0 then
+        local empty = Instance.new("Frame", gridScr)
+        empty.Size = UDim2.new(1,0,0,60); empty.BackgroundTransparency = 1; empty.LayoutOrder = 1
+        local et = Instance.new("TextLabel", empty)
+        et.Size = UDim2.new(1,0,1,0); et.BackgroundTransparency = 1
+        if activeTab == "fav" then
+            et.Text = "No favorites yet\nClick ★ on any emote"
+        elseif activeTab == "recent" then
+            et.Text = "No recent emotes\nPlay some emotes first"
+        else
+            et.Text = "No emotes found"
+        end
+        et.TextColor3 = S.textSoft; et.Font = Enum.Font.Gotham; et.TextSize = 11
         return
     end
-    for i, emote in ipairs(fl) do
-        local row = Instance.new("Frame", fScr)
-        row.Size = UDim2.new(1,-4,0,40); row.BackgroundColor3 = S.btnBg
-        row.BackgroundTransparency = 0.06; row.LayoutOrder = i; row.ZIndex = 4
-        corner(row, 8)
-        local rs = stk(row, S.stroke, 0.55, 1)
-
-        local ic = Instance.new("ImageLabel", row)
-        ic.Size = UDim2.new(0,30,0,30); ic.Position = UDim2.new(0,5,0.5,-15)
-        ic.BackgroundTransparency = 1; ic.Image = Thumb(emote.id); ic.ZIndex = 5
-        corner(ic, 4)
-
-        local n = Instance.new("TextLabel", row)
-        n.Size = UDim2.new(1,-72,1,0); n.Position = UDim2.new(0,38,0,0)
-        n.BackgroundTransparency = 1; n.Text = emote.name; n.TextColor3 = S.textMain
-        n.Font = Enum.Font.GothamSemibold; n.TextSize = 10
-        n.TextXAlignment = Enum.TextXAlignment.Left
-        n.TextTruncate = Enum.TextTruncate.AtEnd; n.ZIndex = 5
-
-        local dB = Instance.new("TextButton", row)
-        dB.Size = UDim2.new(0,20,0,20); dB.Position = UDim2.new(1,-24,0.5,-10)
-        dB.BackgroundColor3 = S.danger; dB.BackgroundTransparency = 0.3
-        dB.Text = "x"; dB.TextColor3 = Color3.fromRGB(255,230,240)
-        dB.Font = Enum.Font.GothamBold; dB.TextSize = 11; dB.ZIndex = 6
-        corner(dB, 5)
-        dB.MouseButton1Click:Connect(function() TogFav(emote.name); RefreshFavs(); RefreshWheel() end)
-
-        local pB = Instance.new("TextButton", row)
-        pB.Size = UDim2.new(1,-30,1,0); pB.BackgroundTransparency = 1; pB.Text = ""; pB.ZIndex = 5
-        pB.MouseButton1Click:Connect(function() PlayAnim(emote, false) end)
-        pB.MouseEnter:Connect(function()
-            TweenService:Create(row, TweenInfo.new(0.08), {BackgroundColor3=S.btnHover}):Play()
-            rs.Color = S.accent; PlayAnim(emote, true)
-        end)
-        pB.MouseLeave:Connect(function()
-            TweenService:Create(row, TweenInfo.new(0.08), {BackgroundColor3=S.btnBg}):Play()
-            rs.Color = S.stroke; StopPrev()
-        end)
+    for i, e in ipairs(list) do
+        MakeCard(e, i)
     end
+    gridScr.CanvasPosition = Vector2.new(0, 0)
 end
 
--- ========== HANDLERS ==========
-prevBtn.MouseButton1Click:Connect(function()
-    curPage = curPage - 1; if curPage < 1 then curPage = NumPages(Filtered()) end; RefreshWheel()
+-- ========== LOOP LOGIC ==========
+loopBtn.MouseButton1Click:Connect(function()
+    emoteLoop = not emoteLoop
+    loopBtn.Text = emoteLoop and "Loop: ON" or "Loop: OFF"
+    loopBtn.TextColor3 = emoteLoop and S.fav or S.textSoft
+    loopInd.Visible = emoteLoop
+    if emoteLoop then
+        tw(loopBtn, 0.1, {BackgroundColor3=Color3.fromRGB(50,40,20)}):Play()
+        loopStk.Color = S.fav; loopStk.Transparency = 0.2
+    else
+        tw(loopBtn, 0.1, {BackgroundColor3=S.btnBg}):Play()
+        loopStk.Color = S.stroke; loopStk.Transparency = 0.55
+    end
+    if curTrack then curTrack.Looped = emoteLoop end
 end)
-nextBtn.MouseButton1Click:Connect(function()
-    curPage = curPage + 1; if curPage > NumPages(Filtered()) then curPage = 1 end; RefreshWheel()
-end)
-for _, b in ipairs({prevBtn, nextBtn}) do
-    b.MouseEnter:Connect(function() TweenService:Create(b, TweenInfo.new(0.08), {BackgroundColor3=S.btnHover, BackgroundTransparency=0}):Play() end)
-    b.MouseLeave:Connect(function() TweenService:Create(b, TweenInfo.new(0.08), {BackgroundColor3=S.btnBg, BackgroundTransparency=0.1}):Play() end)
-end
 
+-- ========== SEARCH ==========
 sBox:GetPropertyChangedSignal("Text"):Connect(function()
-    searchTxt = sBox.Text; curPage = 1; RefreshWheel()
+    searchTxt = sBox.Text; RefreshGrid()
 end)
 
-dim.MouseButton1Click:Connect(function()
-    isOpen = false; root.Visible = false; StopPrev()
-end)
+-- ========== CLOSE ==========
+local function Close()
+    isOpen = false
+    tw(panel, 0.2, {Position = UDim2.new(panel.Position.X.Scale, panel.Position.X.Offset, panel.Position.Y.Scale, panel.Position.Y.Offset + 30)}):Play()
+    tw(dim, 0.2, {BackgroundTransparency = 1}):Play()
+    task.delay(0.2, function()
+        root.Visible = false; StopPrev()
+    end)
+end
 
--- Toggle (page saved!)
+closeBtn.MouseButton1Click:Connect(Close)
+dim.MouseButton1Click:Connect(Close)
+
+-- ========== TOGGLE ==========
 local function Toggle()
-    isOpen = not isOpen
-    root.Visible = isOpen
-    if isOpen then RefreshWheel(); RefreshFavs() else StopPrev() end
+    if isOpen then Close(); return end
+    isOpen = true
+    root.Visible = true
+    dim.BackgroundTransparency = 1
+    tw(dim, 0.25, {BackgroundTransparency = 0.5}):Play()
+    -- Animate in from slightly below
+    local target = panel.Position
+    panel.Position = UDim2.new(target.X.Scale, target.X.Offset, target.Y.Scale, target.Y.Offset + 30)
+    tw(panel, 0.25, {Position = target}):Play()
+    SetTab(activeTab)
+    RefreshGrid()
 end
 
 -- Export for codex.lua buttons
 getgenv().__ToggleEmoteWheel = Toggle
-getgenv().__StopEmote = StopCur
+getgenv().__StopEmote = function() StopCur(); StopPrev(); UpdateNP("") end
 
 UserInputService.InputBegan:Connect(function(input, gpe)
     if gpe then return end
     if input.KeyCode == Enum.KeyCode.Period then Toggle() end
+    if input.KeyCode == Enum.KeyCode.Escape and isOpen then Close() end
 end)
 
-LocalPlayer.CharacterAdded:Connect(function() curTrack = nil; prevTrack = nil end)
+LocalPlayer.CharacterAdded:Connect(function()
+    curTrack = nil; prevTrack = nil; UpdateNP("")
+end)
 
-RefreshWheel(); RefreshFavs(); root.Visible = false
-SendNotify("Колесо эмоций: 996. Нажми '.'")
-print("[Emote Wheel] 996 emotes. Toggle: . / Ю")
+-- Init
+SetTab("all")
+root.Visible = false
+SendNotify("Emote Wheel: " .. #AllEmotes .. " emotes. Press '.'")
+print("[Emote Wheel] " .. #AllEmotes .. " emotes loaded. Toggle: '.' | Esc to close")
