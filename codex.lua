@@ -216,6 +216,21 @@ local Locale = {
     bind_menu = "Переключ. меню", bind_fly = "Переключ. полёта", bind_panic = "Паника (скрыть)", bind_tp_mouse = "ТП к мышке",
     bind_press_key = "[Нажмите любую клавишу...]",
     notify_bind_set = "Бинд: %s → %s",
+    -- АВАТАР
+    tab_avatar = "🎭 Аватар",
+    avatar_copy_player = "📋 Скопировать скин игрока",
+    avatar_add_accessory = "Добавить аксессуар (ID)",
+    avatar_remove_all = "🗑 Удалить все аксессуары",
+    avatar_reset = "↩ Сбросить к оригиналу",
+    avatar_headless = "👻 Безголовый",
+    avatar_korblox = "🦿 Корблокс",
+    avatar_input_id = "Введите Asset ID...",
+    avatar_input_user = "Имя игрока или UserId...",
+    avatar_apply = "✓ Применить",
+    avatar_copy_from = "📋 Скопировать аватар по нику/ID",
+    avatar_presets = "⭐ Популярные аксессуары",
+    avatar_bundle = "📦 Применить бандл (Bundle ID)",
+    avatar_bundle_input = "Введите Bundle ID...",
 }
 
 local Tooltips = {
@@ -1314,7 +1329,7 @@ refBtn.MouseEnter:Connect(function() TweenService:Create(refBtn, TweenInfo.new(0
 refBtn.MouseLeave:Connect(function() TweenService:Create(refBtn, TweenInfo.new(0.15), {BackgroundTransparency = 0.08}):Play() end)
 
 local plScroll = Instance.new("ScrollingFrame", playerWindow)
-plScroll.Size = UDim2.new(1, -14, 1, -270); plScroll.Position = UDim2.new(0, 7, 0, 104); plScroll.BackgroundTransparency = 1; plScroll.BorderSizePixel = 0; plScroll.ScrollBarThickness = 3; plScroll.ScrollBarImageColor3 = UIStyle.accent
+plScroll.Size = UDim2.new(1, -14, 1, -300); plScroll.Position = UDim2.new(0, 7, 0, 96); plScroll.BackgroundTransparency = 1; plScroll.BorderSizePixel = 0; plScroll.ScrollBarThickness = 3; plScroll.ScrollBarImageColor3 = UIStyle.accent; plScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 local plLayout = Instance.new("UIListLayout", plScroll); plLayout.SortOrder = Enum.SortOrder.LayoutOrder; plLayout.Padding = UDim.new(0, 4)
 plLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() plScroll.CanvasSize = UDim2.new(0, 0, 0, plLayout.AbsoluteContentSize.Y + 5) end)
 
@@ -1329,7 +1344,7 @@ local selName = Instance.new("TextLabel", actionPanel)
 local searchBox = Instance.new("TextBox", actionPanel)
 searchBox.Size = UDim2.new(1, -16, 0, 26); searchBox.Position = UDim2.new(0, 8, 0, 38)
 searchBox.BackgroundColor3 = UIStyle.inputBg; searchBox.BackgroundTransparency = 0.06
-searchBox.TextColor3 = UIStyle.textMain; searchBox.PlaceholderText = L("search"); searchBox.PlaceholderColor3 = UIStyle.textSoft
+searchBox.Text = ""; searchBox.TextColor3 = UIStyle.textMain; searchBox.PlaceholderText = L("search"); searchBox.PlaceholderColor3 = UIStyle.textSoft
 searchBox.Font = Enum.Font.GothamSemibold; searchBox.TextSize = 10; searchBox.ClearTextOnFocus = false
 Instance.new("UICorner", searchBox).CornerRadius = UDim.new(0, 6)
 local sts = AddPanelStroke(searchBox, UIStyle.stroke, 0.58, 1)
@@ -1427,59 +1442,79 @@ local function UpdateSortButtonsVisual()
 end
 
 local function RefreshPlayerList(filter)
-    for _, v in ipairs(plScroll:GetChildren()) do if v:IsA("TextButton") then v:Destroy() end end
-    local list = Players:GetPlayers()
-    local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    table.sort(list, function(a,b)
-        if a == LocalPlayer then return false end
-        if b == LocalPlayer then return true end
-        if currentSortMode == "name" then return a.Name:lower() < b.Name:lower() end
-        if not a.Character or not b.Character then return false end
-        if currentSortMode == "hp" then
-            local hA = a.Character:FindFirstChildOfClass("Humanoid")
-            local hB = b.Character:FindFirstChildOfClass("Humanoid")
-            return (hA and hA.Health or 0) < (hB and hB.Health or 0)
+    local ok, err = pcall(function()
+        for _, v in ipairs(plScroll:GetChildren()) do if v:IsA("TextButton") then v:Destroy() end end
+        local list = {}
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer then table.insert(list, p) end
         end
-        if currentSortMode == "visible" then
-            local vA = isVisibleCache[a] and 1 or 0
-            local vB = isVisibleCache[b] and 1 or 0
-            if vA ~= vB then return vA > vB end
+        local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        local function getDist(player)
+            if not myRoot then return 1e9 end
+            local c = player.Character
+            if not c then return 1e9 end
+            local r = c:FindFirstChild("HumanoidRootPart")
+            if not r then return 1e9 end
+            return (r.Position - myRoot.Position).Magnitude
         end
-        if not myRoot then return false end
-        local rA = a.Character:FindFirstChild("HumanoidRootPart")
-        local rB = b.Character:FindFirstChild("HumanoidRootPart")
-        if not rA or not rB then return false end
-        return (rA.Position - myRoot.Position).Magnitude < (rB.Position - myRoot.Position).Magnitude
+        pcall(function()
+            table.sort(list, function(a,b)
+                if currentSortMode == "name" then return a.Name:lower() < b.Name:lower() end
+                if currentSortMode == "hp" then
+                    local cA, cB = a.Character, b.Character
+                    local hA = cA and cA:FindFirstChildOfClass("Humanoid")
+                    local hB = cB and cB:FindFirstChildOfClass("Humanoid")
+                    local ha = hA and hA.Health or 0
+                    local hb = hB and hB.Health or 0
+                    if ha ~= hb then return ha < hb end
+                    return a.Name:lower() < b.Name:lower()
+                end
+                if currentSortMode == "visible" then
+                    local vA = isVisibleCache[a] and 1 or 0
+                    local vB = isVisibleCache[b] and 1 or 0
+                    if vA ~= vB then return vA > vB end
+                end
+                local dA = getDist(a)
+                local dB = getDist(b)
+                if dA ~= dB then return dA < dB end
+                return a.Name:lower() < b.Name:lower()
+            end)
+        end)
+        local count = 0
+        for i, p in ipairs(list) do
+            if filter and filter ~= "" and not string.find(string.lower(p.Name), string.lower(filter)) then continue end
+            count = count + 1
+            local pBtn = Instance.new("TextButton", plScroll)
+            local isSelected = tempTargets[p.UserId] and true or false
+            pBtn.Size = UDim2.new(1, -4, 0, 28); pBtn.LayoutOrder = i; pBtn.BackgroundColor3 = isSelected and UIStyle.btnActive or UIStyle.btnBg; pBtn.BackgroundTransparency = isSelected and 0.06 or 0.16; pBtn.TextColor3 = UIStyle.textMain; pBtn.Text = (isSelected and " ✓ " or "   ") .. p.Name; pBtn.Font = Enum.Font.GothamSemibold; pBtn.TextSize = 10; pBtn.TextXAlignment = Enum.TextXAlignment.Left; Instance.new("UICorner", pBtn).CornerRadius = UDim.new(0, 7)
+            local pStroke = AddPanelStroke(pBtn, isSelected and UIStyle.accentSoft or UIStyle.stroke, isSelected and 0.3 or 0.7, 1)
+            pStroke.Name = "PlayerStroke"
+            pBtn.MouseEnter:Connect(function() TweenService:Create(pBtn, TweenInfo.new(0.12), {BackgroundTransparency = 0.06, BackgroundColor3 = isSelected and UIStyle.btnActive or UIStyle.btnHover}):Play() end)
+            pBtn.MouseLeave:Connect(function()
+                local selectedNow = tempTargets[p.UserId] and true or false
+                TweenService:Create(pBtn, TweenInfo.new(0.12), {BackgroundTransparency = selectedNow and 0.06 or 0.16, BackgroundColor3 = selectedNow and UIStyle.btnActive or UIStyle.btnBg}):Play()
+            end)
+            pBtn.MouseButton1Click:Connect(function()
+                if tempTargets[p.UserId] then
+                    tempTargets[p.UserId] = nil
+                else
+                    tempTargets[p.UserId] = p
+                    tempTarget = p
+                end
+                SyncLoopTargets()
+                if Settings.TP.LoopTP and #Settings.TP.TargetPlayers == 0 then
+                    Settings.TP.LoopTP = false
+                    loopTpUIBtn.Text = L("loop_tp") .. ": " .. L("off")
+                    UpdateLoopTpButtonVisual()
+                end
+                UpdateSelectedLabel()
+                RefreshPlayerList(searchBox.Text)
+            end)
+        end
+        plScroll.CanvasSize = UDim2.new(0, 0, 0, count * 32 + 5)
     end)
-    for _, p in ipairs(list) do
-        if p == LocalPlayer then continue end
-        if filter and filter ~= "" and not string.find(string.lower(p.Name), string.lower(filter)) then continue end
-        local pBtn = Instance.new("TextButton", plScroll)
-        local isSelected = tempTargets[p.UserId] and true or false
-        pBtn.Size = UDim2.new(1, -4, 0, 28); pBtn.BackgroundColor3 = isSelected and UIStyle.btnActive or UIStyle.btnBg; pBtn.BackgroundTransparency = isSelected and 0.06 or 0.16; pBtn.TextColor3 = UIStyle.textMain; pBtn.Text = (isSelected and " ✓ " or "   ") .. p.Name; pBtn.Font = Enum.Font.GothamSemibold; pBtn.TextSize = 10; pBtn.TextXAlignment = Enum.TextXAlignment.Left; Instance.new("UICorner", pBtn).CornerRadius = UDim.new(0, 7)
-        local pStroke = AddPanelStroke(pBtn, isSelected and UIStyle.accentSoft or UIStyle.stroke, isSelected and 0.3 or 0.7, 1)
-        pStroke.Name = "PlayerStroke"
-        pBtn.MouseEnter:Connect(function() TweenService:Create(pBtn, TweenInfo.new(0.12), {BackgroundTransparency = 0.06, BackgroundColor3 = isSelected and UIStyle.btnActive or UIStyle.btnHover}):Play() end)
-        pBtn.MouseLeave:Connect(function()
-            local selectedNow = tempTargets[p.UserId] and true or false
-            TweenService:Create(pBtn, TweenInfo.new(0.12), {BackgroundTransparency = selectedNow and 0.06 or 0.16, BackgroundColor3 = selectedNow and UIStyle.btnActive or UIStyle.btnBg}):Play()
-        end)
-        pBtn.MouseButton1Click:Connect(function()
-            if tempTargets[p.UserId] then
-                tempTargets[p.UserId] = nil
-            else
-                tempTargets[p.UserId] = p
-                tempTarget = p
-            end
-            SyncLoopTargets()
-            if Settings.TP.LoopTP and #Settings.TP.TargetPlayers == 0 then
-                Settings.TP.LoopTP = false
-                loopTpUIBtn.Text = L("loop_tp") .. ": " .. L("off")
-                UpdateLoopTpButtonVisual()
-            end
-            UpdateSelectedLabel()
-            RefreshPlayerList(searchBox.Text)
-        end)
+    if not ok then
+        SendNotify("PlayerList error: " .. tostring(err))
     end
 end
 refBtn.MouseButton1Click:Connect(function() RefreshPlayerList(searchBox.Text) end)
@@ -1578,6 +1613,7 @@ local tabWorld = CreateTab(L("tab_world"))
 local tabRage = CreateTab(L("tab_rage"))
 local tabProtection = CreateTab(L("tab_protection"))
 local tabMisc = CreateTab(L("tab_settings"))
+local tabAvatar = CreateTab(L("tab_avatar"))
 local tabBinds = CreateTab(L("tab_binds"))
 
 -- Bind button helper
@@ -2347,6 +2383,230 @@ AddButton(tabMisc, L("item_inspector") .. ": " .. L("off"), function(b,c) Settin
 AddButton(tabMisc, L("iy_load"), function(b,c) loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))(); SendNotify("Loaded Infinite Yield"); c(true) end)
 AddButton(tabMisc, L("dex_load"), function(b,c) loadstring(game:HttpGet("https://raw.githubusercontent.com/infyiff/backup/main/dex.lua"))(); SendNotify("Loaded DEX Explorer"); c(true) end)
 AddButton(tabMisc, L("remote_spy"), function(b,c) loadstring(game:HttpGet("https://raw.githubusercontent.com/infyiff/backup/main/SimpleSpyV3/main.lua"))(); SendNotify("Loaded SimpleSpy V3"); c(true) end)
+
+-- ============================================================
+-- // АВАТАР (смена скина / аксессуары / бандлы)
+-- ============================================================
+-- Утилита: скопировать внешний вид персонажа (без ApplyDescription)
+local function CopyAvatarFrom(targetPlayer)
+    local myChar = LocalPlayer.Character
+    local targetChar = targetPlayer and targetPlayer.Character
+    if not myChar or not targetChar then
+        SendNotify("⚠ Персонаж не найден")
+        return
+    end
+    local myHum = myChar:FindFirstChildOfClass("Humanoid")
+    if not myHum then return end
+
+    -- Удалить свои аксессуары
+    for _, obj in ipairs(myChar:GetChildren()) do
+        if obj:IsA("Accessory") or obj:IsA("Hat") then
+            obj:Destroy()
+        end
+    end
+
+    -- Метод 1: Получить описание через серверный API по UserId
+    local accIds = {}
+    local descOk, desc = pcall(function()
+        return Players:GetHumanoidDescriptionFromUserId(targetPlayer.UserId)
+    end)
+
+    if descOk and desc then
+        -- Парсим все поля с аксессуарами (содержат ID через запятую)
+        for _, prop in ipairs({"HatAccessory","HairAccessory","FaceAccessory","NeckAccessory","ShouldersAccessory","FrontAccessory","BackAccessory","WaistAccessory"}) do
+            pcall(function()
+                local val = desc[prop]
+                if val and val ~= "" then
+                    for id in tostring(val):gmatch("%d+") do
+                        local n = tonumber(id)
+                        if n and n > 0 then table.insert(accIds, n) end
+                    end
+                end
+            end)
+        end
+    end
+
+    -- Метод 2: Если по UserId не получилось, пробуем GetAppliedDescription
+    if #accIds == 0 then
+        pcall(function()
+            local targetHum = targetChar:FindFirstChildOfClass("Humanoid")
+            if targetHum then
+                local d = targetHum:GetAppliedDescription()
+                if d then
+                    for _, prop in ipairs({"HatAccessory","HairAccessory","FaceAccessory","NeckAccessory","ShouldersAccessory","FrontAccessory","BackAccessory","WaistAccessory"}) do
+                        pcall(function()
+                            local val = d[prop]
+                            if val and val ~= "" then
+                                for id in tostring(val):gmatch("%d+") do
+                                    local n = tonumber(id)
+                                    if n and n > 0 then table.insert(accIds, n) end
+                                end
+                            end
+                        end)
+                    end
+                end
+            end
+        end)
+    end
+
+    -- Загружаем и добавляем аксессуары
+    local addedCount = 0
+    for _, assetId in ipairs(accIds) do
+        local ok2, err2 = pcall(function()
+            local objects = game:GetObjects("rbxassetid://" .. tostring(assetId))
+            if objects then
+                for _, obj in ipairs(objects) do
+                    if obj:IsA("Accessory") or obj:IsA("Hat") then
+                        myHum:AddAccessory(obj)
+                        addedCount = addedCount + 1
+                        return
+                    end
+                    local child = obj:FindFirstChildWhichIsA("Accessory") or obj:FindFirstChildWhichIsA("Hat")
+                    if child then
+                        myHum:AddAccessory(child)
+                        addedCount = addedCount + 1
+                        return
+                    end
+                end
+            end
+        end)
+    end
+
+    -- Метод 3: Если ничего не загрузилось — прямой Clone
+    if addedCount == 0 then
+        for _, obj in ipairs(targetChar:GetChildren()) do
+            if obj:IsA("Accessory") or obj:IsA("Hat") then
+                pcall(function()
+                    local c = obj:Clone()
+                    c.Parent = myChar
+                    addedCount = addedCount + 1
+                end)
+            end
+        end
+    end
+
+    -- Скопировать Shirt
+    pcall(function()
+        local ts = targetChar:FindFirstChildOfClass("Shirt")
+        local ms = myChar:FindFirstChildOfClass("Shirt")
+        if ts then
+            if not ms then ms = Instance.new("Shirt", myChar) end
+            ms.ShirtTemplate = ts.ShirtTemplate
+        elseif ms then ms:Destroy() end
+    end)
+
+    -- Скопировать Pants
+    pcall(function()
+        local tp = targetChar:FindFirstChildOfClass("Pants")
+        local mp = myChar:FindFirstChildOfClass("Pants")
+        if tp then
+            if not mp then mp = Instance.new("Pants", myChar) end
+            mp.PantsTemplate = tp.PantsTemplate
+        elseif mp then mp:Destroy() end
+    end)
+
+    -- Скопировать ShirtGraphic (футболка)
+    pcall(function()
+        local tt = targetChar:FindFirstChildOfClass("ShirtGraphic")
+        local mt = myChar:FindFirstChildOfClass("ShirtGraphic")
+        if tt then
+            if not mt then mt = Instance.new("ShirtGraphic", myChar) end
+            mt.Graphic = tt.Graphic
+        elseif mt then mt:Destroy() end
+    end)
+
+    -- Скопировать BodyColors
+    pcall(function()
+        local tbc = targetChar:FindFirstChildOfClass("BodyColors")
+        local mbc = myChar:FindFirstChildOfClass("BodyColors")
+        if tbc and mbc then
+            mbc.HeadColor3 = tbc.HeadColor3
+            mbc.TorsoColor3 = tbc.TorsoColor3
+            mbc.LeftArmColor3 = tbc.LeftArmColor3
+            mbc.RightArmColor3 = tbc.RightArmColor3
+            mbc.LeftLegColor3 = tbc.LeftLegColor3
+            mbc.RightLegColor3 = tbc.RightLegColor3
+        end
+    end)
+
+    -- Скопировать лицо
+    pcall(function()
+        local mh = myChar:FindFirstChild("Head")
+        local th = targetChar:FindFirstChild("Head")
+        if mh and th then
+            local tf = th:FindFirstChild("face") or th:FindFirstChildOfClass("Decal")
+            local mf = mh:FindFirstChild("face") or mh:FindFirstChildOfClass("Decal")
+            if tf then
+                if not mf then mf = Instance.new("Decal", mh); mf.Name = "face" end
+                mf.Texture = tf.Texture
+            end
+        end
+    end)
+
+    SendNotify("✓ " .. targetPlayer.Name .. " | акс: " .. addedCount .. " | IDs найдено: " .. #accIds)
+end
+
+-- Копировать скин игрока с сервера (по клику)
+do
+    local frame = Instance.new("Frame", tabAvatar)
+    frame.Size = UDim2.new(1, -6, 0, 38); frame.BackgroundTransparency = 1
+
+    local lbl = Instance.new("TextLabel", frame)
+    lbl.Size = UDim2.new(1, -10, 0, 20); lbl.Position = UDim2.new(0, 5, 0, 2); lbl.BackgroundTransparency = 1
+    lbl.Text = "👥 Игроки на сервере (нажми чтобы скопировать скин):"; lbl.TextColor3 = UIStyle.accent
+    lbl.Font = Enum.Font.GothamBold; lbl.TextSize = 10; lbl.TextXAlignment = Enum.TextXAlignment.Left
+end
+
+for _, p in ipairs(Players:GetPlayers()) do
+    if p ~= LocalPlayer then
+        AddButton(tabAvatar, "📋 " .. p.Name, function(b, c)
+            CopyAvatarFrom(p)
+            c(true)
+        end)
+    end
+end
+
+-- Действия с аватаром
+AddButton(tabAvatar, L("avatar_remove_all"), function(b, c)
+    pcall(function()
+        local char = LocalPlayer.Character
+        if not char then return end
+        for _, obj in ipairs(char:GetChildren()) do
+            if obj:IsA("Accessory") or obj:IsA("Hat") then
+                obj:Destroy()
+            end
+        end
+        SendNotify("✓ Все аксессуары удалены")
+    end)
+    c(true)
+end)
+
+AddButton(tabAvatar, L("avatar_headless"), function(b, c)
+    pcall(function()
+        local char = LocalPlayer.Character
+        if not char then return end
+        local head = char:FindFirstChild("Head")
+        if head then
+            head.Transparency = 1
+            local face = head:FindFirstChildOfClass("Decal") or head:FindFirstChild("face")
+            if face then face.Transparency = 1 end
+            -- Удалить аксессуары на голове
+            for _, obj in ipairs(char:GetChildren()) do
+                if obj:IsA("Accessory") then
+                    local handle = obj:FindFirstChild("Handle")
+                    if handle then
+                        local weld = handle:FindFirstChildOfClass("Weld") or handle:FindFirstChildOfClass("WeldConstraint")
+                        if weld and (weld.Part1 == head or weld.Part0 == head) then
+                            obj:Destroy()
+                        end
+                    end
+                end
+            end
+            SendNotify("✓ Безголовый режим")
+        end
+    end)
+    c(true)
+end)
 
 -- Bind Manager
 AddBindButton(tabBinds, L("bind_menu"), "Menu")
